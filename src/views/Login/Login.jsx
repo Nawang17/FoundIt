@@ -18,13 +18,14 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import { auth } from "../../../firebaseConfig";
+import { useNavigate } from "react-router";
 
 export default function LoginPage({ onSuccess }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loadingEmail, setLoadingEmail] = useState(false);
   const [loadingGoogle, setLoadingGoogle] = useState(false);
-
+  const navigate = useNavigate();
   const handleEmailLogin = async (e) => {
     e.preventDefault();
     if (!email || !password) {
@@ -43,7 +44,8 @@ export default function LoginPage({ onSuccess }) {
         title: "Welcome back",
         message: "Signed in successfully.",
       });
-      onSuccess?.(); // parent can decide where to go next
+      onSuccess?.();
+      navigate("/");
     } catch (err) {
       const msg =
         err.code === "auth/invalid-credential"
@@ -74,6 +76,7 @@ export default function LoginPage({ onSuccess }) {
         message: "Google sign-in successful.",
       });
       onSuccess?.();
+      navigate("/");
     } catch (err) {
       notifications.show({
         color: "red",

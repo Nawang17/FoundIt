@@ -103,6 +103,7 @@ export default function RegisterPage({ onSuccess }) {
         message: "Google account connected.",
       });
       onSuccess?.();
+      navigate("/");
     } catch (err) {
       notifications.show({
         color: "red",
