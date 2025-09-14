@@ -19,7 +19,7 @@ npm -v
 ## Install
 ```
 On your terminal
-git clone https://github.com/Nawang17/FoundIt
+git clone https://github.com/Nawang17/FoundIt.git
 cd foundit
 npm install
 ```
@@ -28,3 +28,4 @@ npm install
 ```npm run dev```
 
 Go to http://localhost:5173/ to view live project
+
