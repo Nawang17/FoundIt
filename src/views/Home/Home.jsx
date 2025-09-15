@@ -1,4 +1,3 @@
-// src/pages/HomePage.jsx
 import { useMemo, useState } from "react";
 import {
   Box,
@@ -42,7 +41,6 @@ export default function HomePage() {
         "Left near Hunter College library silent floor. Has physics notes inside.",
       user: "Alice Johnson",
       time: "2h ago",
-
       location: "Hunter College Library",
     },
     {
@@ -64,8 +62,62 @@ export default function HomePage() {
       description: "Fell near subway entrance. Keychain says CUNY.",
       user: "Charlie Kim",
       time: "1d ago",
-
       location: "68 St–Hunter College",
+    },
+    {
+      id: 4,
+      type: "found",
+      title: "Blue Hydro Flask Bottle",
+      description:
+        "32oz with stickers on it. Picked up near the campus gym entrance.",
+      user: "Dana Ortiz",
+      time: "1d ago",
+      image:
+        "https://i.redd.it/how-to-make-stickers-stick-on-my-hydro-flask-ive-tried-v0-cdzzzut1wqf81.jpg?width=3000&format=pjpg&auto=webp&s=cdbb3337a6db30d9afa7682326d67f94ee3ee140",
+      location: "Campus Gym",
+    },
+    {
+      id: 5,
+      type: "lost",
+      title: "MacBook Pro 14-inch",
+      description:
+        "Laptop in a gray sleeve, last seen in the cafeteria. Very important files inside.",
+      user: "Ethan Park",
+      time: "2d ago",
+      image:
+        "https://www.cnet.com/a/img/resize/744ffe800ebfcf37a46faba935674ae68403efa0/hub/2021/10/23/80425069-0d3e-4c67-9085-a66e6177fc60/macbook-pro-2021-cnet-review-12.jpg?auto=webp&width=1200",
+      location: "Hunter College Cafeteria",
+    },
+    {
+      id: 6,
+      type: "found",
+      title: "Set of Earbuds",
+      description:
+        "White AirPods Pro in a small case found near the library entrance.",
+      user: "Fiona Lee",
+      time: "3d ago",
+      location: "Library Entrance",
+    },
+    {
+      id: 7,
+      type: "lost",
+      title: "Green Jacket",
+      description:
+        "Patagonia jacket left in a lecture hall after evening class.",
+      user: "George Smith",
+      time: "4d ago",
+      image: "https://i.ebayimg.com/images/g/-dAAAOSwk8hmh7ow/s-l400.jpg",
+      location: "Lecture Hall B",
+    },
+    {
+      id: 8,
+      type: "found",
+      title: "Wallet with Hunter ID",
+      description:
+        "Brown leather wallet with student ID inside. Turned in to security desk.",
+      user: "Helen Chen",
+      time: "5d ago",
+      location: "Security Desk",
     },
   ];
 
