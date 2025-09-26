@@ -4,6 +4,7 @@ import { Box, Group, Button, Text } from "@mantine/core";
 import { useNavigate } from "react-router";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
+import { notifications } from "@mantine/notifications";
 
 export default function AppHeader() {
   const navigate = useNavigate();
@@ -18,6 +19,12 @@ export default function AppHeader() {
   const handleLogout = async () => {
     try {
       await signOut(auth);
+      notifications.show({
+        title: "Logged out",
+        message: "You have been logged out successfully.",
+        color: "green",
+        position: "top-center",
+      });
       navigate("/login");
     } catch (err) {
       console.error("Logout error:", err);
@@ -60,9 +67,15 @@ export default function AppHeader() {
       {/* Auth Buttons */}
       <Group gap="sm">
         {user ? (
-          <Button onClick={handleLogout} color="red" variant="light">
-            Logout
-          </Button>
+          <>
+            <Button onClick={() => navigate("/create-post")} color="blue">
+              Create Post
+            </Button>
+
+            <Button onClick={handleLogout} color="red" variant="light">
+              Logout
+            </Button>
+          </>
         ) : (
           <>
             <Button

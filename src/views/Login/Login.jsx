@@ -33,6 +33,7 @@ export default function LoginPage({ onSuccess }) {
         color: "red",
         title: "Missing info",
         message: "Enter email and password.",
+        position: "top-center",
       });
       return;
     }
@@ -43,6 +44,7 @@ export default function LoginPage({ onSuccess }) {
         color: "green",
         title: "Welcome back",
         message: "Signed in successfully.",
+        position: "top-center",
       });
       onSuccess?.();
       navigate("/");
@@ -59,6 +61,7 @@ export default function LoginPage({ onSuccess }) {
         color: "red",
         title: "Sign-in failed",
         message: msg,
+        position: "top-center",
       });
     } finally {
       setLoadingEmail(false);
@@ -74,6 +77,7 @@ export default function LoginPage({ onSuccess }) {
         color: "green",
         title: "Signed in",
         message: "Google sign-in successful.",
+        position: "top-center",
       });
       onSuccess?.();
       navigate("/");
@@ -82,6 +86,7 @@ export default function LoginPage({ onSuccess }) {
         color: "red",
         title: "Google sign-in failed",
         message: err.message,
+        position: "top-center",
       });
     } finally {
       setLoadingGoogle(false);

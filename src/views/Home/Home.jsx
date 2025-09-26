@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+// src/pages/HomePage.jsx
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Text,
@@ -11,13 +12,32 @@ import {
   Avatar,
   ActionIcon,
   Tooltip,
-  Image,
   Stack,
   SegmentedControl,
   rem,
+  Skeleton,
+  Flex,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
-import { IconSearch, IconBookmark, IconShare2 } from "@tabler/icons-react";
+import {
+  IconSearch,
+  IconBookmark,
+  IconShare2,
+  IconMapPin,
+  IconTrash,
+} from "@tabler/icons-react";
+
+import {
+  collection,
+  onSnapshot,
+  orderBy,
+  query as fsQuery,
+  deleteDoc,
+  doc,
+} from "firebase/firestore";
+import { getAuth, onAuthStateChanged } from "firebase/auth";
+import { notifications } from "@mantine/notifications";
+import { db } from "../../../firebaseConfig";
 
 function initials(name = "") {
   const parts = name.trim().split(" ");
@@ -25,101 +45,78 @@ function initials(name = "") {
   return (parts[0][0] + (parts[parts.length - 1]?.[0] || "")).toUpperCase();
 }
 
+// Simple "time ago" helper for Firestore Timestamps / Dates / numbers
+function timeAgo(createdAt) {
+  if (!createdAt) return "";
+  const ms =
+    typeof createdAt === "number"
+      ? createdAt
+      : createdAt?.toMillis
+      ? createdAt.toMillis()
+      : createdAt?.seconds
+      ? createdAt.seconds * 1000
+      : +createdAt || Date.now();
+  const diff = Date.now() - ms;
+  if (diff < 60_000) return "just now";
+  const minutes = Math.floor(diff / 60_000);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 5) return `${weeks}w ago`;
+  const months = Math.floor(days / 30);
+  if (months < 12) return `${months}mo ago`;
+  const years = Math.floor(days / 365);
+  return `${years}y ago`;
+}
+
 export default function HomePage() {
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState("all"); // all | lost | found
-  const [sortBy, setSortBy] = useState("latest"); // latest | alpha | withImage
+  const [sortBy, setSortBy] = useState("latest"); // latest | alpha
+  const [loading, setLoading] = useState(true);
+  const [posts, setPosts] = useState([]);
+  const [me, setMe] = useState(null); // current user
   const isMobile = useMediaQuery("(max-width: 48em)");
 
-  // Demo posts
-  const posts = [
-    {
-      id: 1,
-      type: "lost",
-      title: "Black North Face Backpack",
-      description:
-        "Left near Hunter College library silent floor. Has physics notes inside.",
-      user: "Alice Johnson",
-      time: "2h ago",
-      location: "Hunter College Library",
-    },
-    {
-      id: 2,
-      type: "found",
-      title: "Black iPhone 13",
-      description:
-        "Found at Starbucks on 68th St. Lock screen shows a golden retriever.",
-      user: "Bob Lee",
-      time: "5h ago",
-      image:
-        "https://cdn.arstechnica.net/wp-content/uploads/2021/09/iPhone-13-mini-scaled.jpeg",
-      location: "Starbucks 68th St",
-    },
-    {
-      id: 3,
-      type: "lost",
-      title: "Keys with Red Keychain",
-      description: "Fell near subway entrance. Keychain says CUNY.",
-      user: "Charlie Kim",
-      time: "1d ago",
-      location: "68 St–Hunter College",
-    },
-    {
-      id: 4,
-      type: "found",
-      title: "Blue Hydro Flask Bottle",
-      description:
-        "32oz with stickers on it. Picked up near the campus gym entrance.",
-      user: "Dana Ortiz",
-      time: "1d ago",
-      image:
-        "https://i.redd.it/how-to-make-stickers-stick-on-my-hydro-flask-ive-tried-v0-cdzzzut1wqf81.jpg?width=3000&format=pjpg&auto=webp&s=cdbb3337a6db30d9afa7682326d67f94ee3ee140",
-      location: "Campus Gym",
-    },
-    {
-      id: 5,
-      type: "lost",
-      title: "MacBook Pro 14-inch",
-      description:
-        "Laptop in a gray sleeve, last seen in the cafeteria. Very important files inside.",
-      user: "Ethan Park",
-      time: "2d ago",
-      image:
-        "https://www.cnet.com/a/img/resize/744ffe800ebfcf37a46faba935674ae68403efa0/hub/2021/10/23/80425069-0d3e-4c67-9085-a66e6177fc60/macbook-pro-2021-cnet-review-12.jpg?auto=webp&width=1200",
-      location: "Hunter College Cafeteria",
-    },
-    {
-      id: 6,
-      type: "found",
-      title: "Set of Earbuds",
-      description:
-        "White AirPods Pro in a small case found near the library entrance.",
-      user: "Fiona Lee",
-      time: "3d ago",
-      location: "Library Entrance",
-    },
-    {
-      id: 7,
-      type: "lost",
-      title: "Green Jacket",
-      description:
-        "Patagonia jacket left in a lecture hall after evening class.",
-      user: "George Smith",
-      time: "4d ago",
-      image: "https://i.ebayimg.com/images/g/-dAAAOSwk8hmh7ow/s-l400.jpg",
-      location: "Lecture Hall B",
-    },
-    {
-      id: 8,
-      type: "found",
-      title: "Wallet with Hunter ID",
-      description:
-        "Brown leather wallet with student ID inside. Turned in to security desk.",
-      user: "Helen Chen",
-      time: "5d ago",
-      location: "Security Desk",
-    },
-  ];
+  // auth subscribe
+  useEffect(() => {
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, (u) => setMe(u || null));
+    return () => unsub();
+  }, []);
+
+  // Subscribe to Firestore posts ordered by createdAt desc for "Latest"
+  useEffect(() => {
+    const q = fsQuery(collection(db, "posts"), orderBy("createdAt", "desc"));
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => {
+          const v = d.data() || {};
+          return {
+            id: d.id,
+            type: v.type || "lost",
+            title: v.title || "",
+            description: v.description || "",
+            user: v.userName || "Unknown",
+            userId: v.userId || null,
+            location: v.location || "",
+            createdAt: v.createdAt || null,
+          };
+        });
+        setPosts(data);
+        setLoading(false);
+      },
+      (err) => {
+        console.error("posts/onSnapshot", err);
+        setLoading(false);
+      }
+    );
+    return () => unsub();
+  }, []);
 
   const counts = useMemo(() => {
     const lost = posts.filter((p) => p.type === "lost").length;
@@ -128,24 +125,28 @@ export default function HomePage() {
   }, [posts]);
 
   const filtered = useMemo(() => {
-    const bySeg = posts.filter((p) =>
-      segment === "all" ? true : p.type === segment
-    );
+    const bySeg =
+      segment === "all" ? posts : posts.filter((p) => p.type === segment);
+
     const q = query.trim().toLowerCase();
     const byQuery = q
-      ? bySeg.filter(
-          (p) =>
-            p.title.toLowerCase().includes(q) ||
-            p.description.toLowerCase().includes(q) ||
-            (p.location ?? "").toLowerCase().includes(q) ||
-            (p.user ?? "").toLowerCase().includes(q)
-        )
+      ? bySeg.filter((p) => {
+          const t = p.title?.toLowerCase() || "";
+          const d = p.description?.toLowerCase() || "";
+          const l = p.location?.toLowerCase() || "";
+          const u = p.user?.toLowerCase() || "";
+          return (
+            t.includes(q) || d.includes(q) || l.includes(q) || u.includes(q)
+          );
+        })
       : bySeg;
 
     const bySort = [...byQuery].sort((a, b) => {
       if (sortBy === "alpha") return a.title.localeCompare(b.title);
-      if (sortBy === "withImage") return (b.image ? 1 : 0) - (a.image ? 1 : 0);
-      return 0; // latest
+      // latest (createdAt desc)
+      const aMs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+      const bMs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+      return bMs - aMs;
     });
 
     return bySort;
@@ -153,6 +154,28 @@ export default function HomePage() {
 
   const typeColor = (t) =>
     t === "lost" ? "red" : t === "found" ? "green" : "gray";
+
+  const handleDelete = async (postId) => {
+    const ok = window.confirm("Delete this post? This cannot be undone.");
+    if (!ok) return;
+    try {
+      await deleteDoc(doc(db, "posts", postId));
+      notifications.show({
+        title: "Deleted",
+        message: "Your post was deleted.",
+        color: "green",
+        position: "top-center",
+      });
+    } catch (e) {
+      console.error("delete post", e);
+      notifications.show({
+        title: "Delete failed",
+        message: "Could not delete the post. Try again.",
+        color: "red",
+        position: "top-center",
+      });
+    }
+  };
 
   return (
     <Box style={{ maxWidth: "1200px", margin: "0 auto", padding: "24px" }}>
@@ -214,7 +237,6 @@ export default function HomePage() {
               data={[
                 { value: "latest", label: "Latest" },
                 { value: "alpha", label: "A to Z" },
-                { value: "withImage", label: "Photos first" },
               ]}
               value={sortBy}
               onChange={setSortBy}
@@ -226,87 +248,109 @@ export default function HomePage() {
       </Box>
 
       {/* Grid */}
-      <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
-        {filtered.map((post) => {
-          const hasImage = Boolean(post.image);
-          return (
-            <Card key={post.id} withBorder radius="lg" padding="md">
-              {/* Media */}
-              {hasImage ? (
-                <Image
-                  src={post.image}
-                  alt={post.title}
-                  height={180}
-                  radius="md"
-                  fit="cover"
-                  withPlaceholder
-                  mb="sm"
-                />
-              ) : (
-                <Box
-                  style={{
-                    height: 180,
-                    borderRadius: 8,
-                    background: "#f5f7fa",
-                    display: "grid",
-                    placeItems: "center",
-                    color: "#94a3b8",
-                    fontSize: 13,
-                    marginBottom: "12px",
-                  }}
-                >
-                  No image
-                </Box>
-              )}
-
-              {/* Content */}
-              <Group justify="space-between" mb={6}>
-                <Text fw={700} size="lg" style={{ letterSpacing: "-0.2px" }}>
-                  {post.title}
-                </Text>
-                <Badge color={typeColor(post.type)}>{post.type}</Badge>
-              </Group>
-              {post.location && (
-                <Text size="xs" c="dimmed" mb={8}>
-                  {post.location}
-                </Text>
-              )}
-              <Text size="sm" c="dimmed" lineClamp={3} mb="md">
-                {post.description}
-              </Text>
-
-              {/* Footer */}
-              <Group justify="space-between" align="center" wrap="nowrap">
-                <Group gap="sm" align="center" wrap="nowrap">
-                  <Avatar radius="xl" size={28}>
-                    {initials(post.user)}
-                  </Avatar>
-                  <Box style={{ minWidth: 0 }}>
-                    <Text size="sm" fw={600} style={{ lineHeight: 1 }}>
-                      {post.user}
-                    </Text>
-                    <Text size="xs" c="dimmed" style={{ lineHeight: 1 }}>
-                      {post.time}
-                    </Text>
-                  </Box>
+      {loading ? (
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Card key={i} withBorder radius="lg" padding="md">
+              <Skeleton height={18} mb="sm" />
+              <Skeleton height={12} width="60%" mb={12} />
+              <Skeleton height={12} mb={6} />
+              <Skeleton height={12} width="90%" mb="md" />
+              <Group justify="space-between" align="center">
+                <Group>
+                  <Skeleton height={28} circle />
+                  <Skeleton height={12} width={120} />
                 </Group>
-                <Group gap={6}>
-                  <Tooltip label="Save">
-                    <ActionIcon variant="subtle" radius="xl" size="lg">
-                      <IconBookmark size={18} />
-                    </ActionIcon>
-                  </Tooltip>
-                  <Tooltip label="Share">
-                    <ActionIcon variant="subtle" radius="xl" size="lg">
-                      <IconShare2 size={18} />
-                    </ActionIcon>
-                  </Tooltip>
-                </Group>
+                <Skeleton height={28} width={68} radius="xl" />
               </Group>
             </Card>
-          );
-        })}
-      </SimpleGrid>
+          ))}
+        </SimpleGrid>
+      ) : (
+        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+          {filtered.map((post) => {
+            const isOwner = me && post.userId && me.uid === post.userId;
+            return (
+              <Card key={post.id} withBorder radius="lg" padding="md">
+                {/* Title + Type + (owner delete) */}
+                <Group justify="space-between" align="flex-start" mb={6}>
+                  <Text fw={700} size="lg" style={{ letterSpacing: "-0.2px" }}>
+                    {post.title}
+                  </Text>
+                  <Group gap="xs">
+                    <Badge color={typeColor(post.type)}>{post.type}</Badge>
+                    {isOwner && (
+                      <Tooltip label="Delete post">
+                        <ActionIcon
+                          variant="subtle"
+                          radius="xl"
+                          size="lg"
+                          aria-label="Delete"
+                          onClick={() => handleDelete(post.id)}
+                        >
+                          <IconTrash size={18} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                  </Group>
+                </Group>
+
+                {post.location && (
+                  <Flex align="center" gap={4} mb={6}>
+                    <IconMapPin size={14} />
+                    <Text size="xs" c="dimmed">
+                      {post.location}
+                    </Text>
+                  </Flex>
+                )}
+
+                <Text size="sm" lineClamp={3} mt="sm" mb="md">
+                  {post.description}
+                </Text>
+
+                {/* Footer */}
+                <Group justify="space-between" align="center" wrap="nowrap">
+                  <Group gap="sm" align="center" wrap="nowrap">
+                    <Avatar radius="xl" size={28}>
+                      {initials(post.user)}
+                    </Avatar>
+                    <Box style={{ minWidth: 0 }}>
+                      <Text size="sm" fw={600} style={{ lineHeight: 1 }}>
+                        {post.user}
+                      </Text>
+                      <Text size="xs" c="dimmed" style={{ lineHeight: 1 }}>
+                        {timeAgo(post.createdAt)}
+                      </Text>
+                    </Box>
+                  </Group>
+                  <Group gap={6}>
+                    <Tooltip label="Save">
+                      <ActionIcon
+                        variant="subtle"
+                        radius="xl"
+                        size="lg"
+                        aria-label="Save"
+                      >
+                        <IconBookmark size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                    <Tooltip label="Share">
+                      <ActionIcon
+                        variant="subtle"
+                        radius="xl"
+                        size="lg"
+                        aria-label="Share"
+                      >
+                        <IconShare2 size={18} />
+                      </ActionIcon>
+                    </Tooltip>
+                  </Group>
+                </Group>
+              </Card>
+            );
+          })}
+        </SimpleGrid>
+      )}
     </Box>
   );
 }

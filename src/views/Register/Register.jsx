@@ -39,6 +39,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "red",
         title: "Missing info",
         message: "Fill all required fields.",
+        position: "top-center",
       });
       return;
     }
@@ -47,6 +48,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "red",
         title: "Password mismatch",
         message: "Passwords do not match.",
+        position: "top-center",
       });
       return;
     }
@@ -55,6 +57,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "red",
         title: "Weak password",
         message: "Use at least 6 characters.",
+        position: "top-center",
       });
       return;
     }
@@ -70,6 +73,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "green",
         title: "Account created",
         message: "Welcome to FoundIt!",
+        position: "top-center",
       });
       onSuccess?.();
       navigate("/");
@@ -86,6 +90,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "red",
         title: "Registration failed",
         message: msg,
+        position: "top-center",
       });
     } finally {
       setLoadingEmail(false);
@@ -101,6 +106,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "green",
         title: "Signed in",
         message: "Google account connected.",
+        position: "top-center",
       });
       onSuccess?.();
       navigate("/");
@@ -109,6 +115,7 @@ export default function RegisterPage({ onSuccess }) {
         color: "red",
         title: "Google sign-in failed",
         message: err.message,
+        position: "top-center",
       });
     } finally {
       setLoadingGoogle(false);
