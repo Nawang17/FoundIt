@@ -17,14 +17,15 @@ import {
   rem,
   Skeleton,
   Flex,
+  Loader,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   IconSearch,
-  IconBookmark,
-  IconShare2,
   IconMapPin,
   IconTrash,
+  IconMessage,
+  IconCircleCheck,
 } from "@tabler/icons-react";
 
 import {
@@ -37,6 +38,7 @@ import {
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { notifications } from "@mantine/notifications";
+import { modals } from "@mantine/modals";
 import { db } from "../../../firebaseConfig";
 
 function initials(name = "") {
@@ -79,6 +81,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
   const [me, setMe] = useState(null); // current user
+  const [deletingId, setDeletingId] = useState(null);
   const isMobile = useMediaQuery("(max-width: 48em)");
 
   // auth subscribe
@@ -134,10 +137,7 @@ export default function HomePage() {
           const t = p.title?.toLowerCase() || "";
           const d = p.description?.toLowerCase() || "";
           const l = p.location?.toLowerCase() || "";
-          const u = p.user?.toLowerCase() || "";
-          return (
-            t.includes(q) || d.includes(q) || l.includes(q) || u.includes(q)
-          );
+          return t.includes(q) || d.includes(q) || l.includes(q);
         })
       : bySeg;
 
@@ -155,26 +155,41 @@ export default function HomePage() {
   const typeColor = (t) =>
     t === "lost" ? "red" : t === "found" ? "green" : "gray";
 
-  const handleDelete = async (postId) => {
-    const ok = window.confirm("Delete this post? This cannot be undone.");
-    if (!ok) return;
-    try {
-      await deleteDoc(doc(db, "posts", postId));
-      notifications.show({
-        title: "Deleted",
-        message: "Your post was deleted.",
-        color: "green",
-        position: "top-center",
-      });
-    } catch (e) {
-      console.error("delete post", e);
-      notifications.show({
-        title: "Delete failed",
-        message: "Could not delete the post. Try again.",
-        color: "red",
-        position: "top-center",
-      });
-    }
+  // Confirm + delete flow using Mantine modals
+  const confirmDelete = (postId) => {
+    modals.openConfirmModal({
+      title: "Delete this post?",
+      children: (
+        <Text size="sm">
+          This action is permanent. The post will be removed for everyone.
+        </Text>
+      ),
+      labels: { confirm: "Delete", cancel: "Cancel" },
+      confirmProps: { color: "red" },
+      centered: true,
+      onConfirm: async () => {
+        try {
+          setDeletingId(postId);
+          await deleteDoc(doc(db, "posts", postId));
+          notifications.show({
+            title: "Deleted",
+            message: "Your post was deleted.",
+            color: "green",
+            position: "top-center",
+          });
+        } catch (e) {
+          console.error("delete post", e);
+          notifications.show({
+            title: "Delete failed",
+            message: "Could not delete the post. Try again.",
+            color: "red",
+            position: "top-center",
+          });
+        } finally {
+          setDeletingId(null);
+        }
+      },
+    });
   };
 
   return (
@@ -270,6 +285,8 @@ export default function HomePage() {
         <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
           {filtered.map((post) => {
             const isOwner = me && post.userId && me.uid === post.userId;
+            const isDeleting = deletingId === post.id;
+
             return (
               <Card key={post.id} withBorder radius="lg" padding="md">
                 {/* Title + Type + (owner delete) */}
@@ -286,9 +303,14 @@ export default function HomePage() {
                           radius="xl"
                           size="lg"
                           aria-label="Delete"
-                          onClick={() => handleDelete(post.id)}
+                          onClick={() => confirmDelete(post.id)}
+                          disabled={isDeleting}
                         >
-                          <IconTrash size={18} />
+                          {isDeleting ? (
+                            <Loader size="xs" />
+                          ) : (
+                            <IconTrash size={18} />
+                          )}
                         </ActionIcon>
                       </Tooltip>
                     )}
@@ -324,24 +346,26 @@ export default function HomePage() {
                     </Box>
                   </Group>
                   <Group gap={6}>
-                    <Tooltip label="Save">
+                    {isOwner && (
+                      <Tooltip label="Mark as resolved">
+                        <ActionIcon
+                          variant="subtle"
+                          radius="xl"
+                          size="lg"
+                          aria-label="Mark as resolved"
+                        >
+                          <IconCircleCheck size={18} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
+                    <Tooltip label="Message user">
                       <ActionIcon
                         variant="subtle"
                         radius="xl"
                         size="lg"
-                        aria-label="Save"
+                        aria-label="Message user"
                       >
-                        <IconBookmark size={18} />
-                      </ActionIcon>
-                    </Tooltip>
-                    <Tooltip label="Share">
-                      <ActionIcon
-                        variant="subtle"
-                        radius="xl"
-                        size="lg"
-                        aria-label="Share"
-                      >
-                        <IconShare2 size={18} />
+                        <IconMessage size={18} />
                       </ActionIcon>
                     </Tooltip>
                   </Group>

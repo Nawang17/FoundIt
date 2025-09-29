@@ -7,18 +7,21 @@ import LoginPage from "./views/Login/Login";
 import RegisterPage from "./views/Register/Register";
 import HomePage from "./views/Home/Home";
 import CreatePostPage from "./views/CreatePost/CreatePost";
+import { ModalsProvider } from "@mantine/modals";
 function App() {
   return (
     <BrowserRouter>
       <MantineProvider>
-        <Notifications />
-        <Header />
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route path="/create-post" element={<CreatePostPage />} />
-        </Routes>
+        <ModalsProvider>
+          <Notifications />
+          <Header />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/register" element={<RegisterPage />} />
+            <Route path="/create-post" element={<CreatePostPage />} />
+          </Routes>
+        </ModalsProvider>
       </MantineProvider>
     </BrowserRouter>
   );
