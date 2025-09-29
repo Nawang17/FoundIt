@@ -47,7 +47,7 @@ export default function ProfilePage() {
                 <Center>
                     <Box ta="center">
                         <Text fw={700} size="28px" style={{ letterSpacing: "-0.3px" }}>
-                            {user?.displayName || "Welcome to Your Profile!"}
+                            {user?.displayName || "Welcome to your profile page!"}
                         </Text>
                         <Text c="dimmed" size="md" mb="lg">
                             {user?.email || ""}

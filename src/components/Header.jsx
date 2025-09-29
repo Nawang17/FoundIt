@@ -1,4 +1,4 @@
-// src/components/AppHeader.jsx
+// Header component for navigation
 import { useEffect, useState } from "react";
 import { Box, Group, Button, Text } from "@mantine/core";
 import { useNavigate } from "react-router";
