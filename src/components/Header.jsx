@@ -73,7 +73,7 @@ export default function AppHeader() {
             </Button>
 
             <Button onClick={() => navigate("/profile")} variant="subtle" color="blue">
-              My Profile
+              Profile
             </Button>
 
             <Button onClick={handleLogout} color="red" variant="light">

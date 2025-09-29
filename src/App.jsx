@@ -13,7 +13,7 @@ function App() {
     <BrowserRouter>
       <MantineProvider>
         <Notifications />
-        {/* Main navigation */}
+        {/* App Navigation Header */}
         <Header />
         <Routes>
           <Route path="/" element={<HomePage />} />
