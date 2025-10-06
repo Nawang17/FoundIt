@@ -36,6 +36,7 @@ import {
   query as fsQuery,
   deleteDoc,
   doc,
+  updateDoc, // ⬅️ NEW
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { notifications } from "@mantine/notifications";
@@ -79,10 +80,12 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState("all"); // all | lost | found
   const [sortBy, setSortBy] = useState("latest"); // latest | alpha
+  const [includeResolved, setIncludeResolved] = useState(false); // ⬅️ NEW: hide resolved by default
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
   const [me, setMe] = useState(null); // current user
   const [deletingId, setDeletingId] = useState(null);
+  const [resolvingId, setResolvingId] = useState(null); // ⬅️ NEW
   const isMobile = useMediaQuery("(max-width: 48em)");
   const nav = useNavigate();
 
@@ -110,6 +113,7 @@ export default function HomePage() {
             userId: v.userId || null,
             location: v.location || "",
             createdAt: v.createdAt || null,
+            resolved: !!v.resolved, // ⬅️ NEW
           };
         });
         setPosts(data);
@@ -133,20 +137,22 @@ export default function HomePage() {
     const bySeg =
       segment === "all" ? posts : posts.filter((p) => p.type === segment);
 
-    const q = query.trim().toLowerCase();
-    const byQuery = q
+    const qtext = query.trim().toLowerCase();
+    const byQuery = qtext
       ? bySeg.filter((p) => {
-        const t = p.title?.toLowerCase() || "";
-        const d = p.description?.toLowerCase() || "";
-        const l = p.location?.toLowerCase() || "";
-        const u = p.user?.toLowerCase() || "";
-        return (
-          t.includes(q) || d.includes(q) || l.includes(q) || u.includes(q)
-        );
-      })
+          const t = p.title?.toLowerCase() || "";
+          const d = p.description?.toLowerCase() || "";
+          const l = p.location?.toLowerCase() || "";
+          return t.includes(qtext) || d.includes(qtext) || l.includes(qtext);
+        })
       : bySeg;
 
-    const bySort = [...byQuery].sort((a, b) => {
+    // Hide resolved unless explicitly included
+    const byStatus = includeResolved
+      ? byQuery
+      : byQuery.filter((p) => !p.resolved);
+
+    const bySort = [...byStatus].sort((a, b) => {
       if (sortBy === "alpha") return a.title.localeCompare(b.title);
       // latest (createdAt desc)
       const aMs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
@@ -155,7 +161,7 @@ export default function HomePage() {
     });
 
     return bySort;
-  }, [posts, segment, query, sortBy]);
+  }, [posts, segment, query, sortBy, includeResolved]);
 
   const typeColor = (t) =>
     t === "lost" ? "red" : t === "found" ? "green" : "gray";
@@ -192,6 +198,51 @@ export default function HomePage() {
           });
         } finally {
           setDeletingId(null);
+        }
+      },
+    });
+  };
+
+  // Confirm + toggle resolved
+  const confirmToggleResolved = (post) => {
+    const willResolve = !post.resolved;
+    modals.openConfirmModal({
+      title: willResolve ? "Mark as resolved?" : "Unresolve this post?",
+      children: (
+        <Text size="sm">
+          {willResolve
+            ? "This will mark the item as resolved and hide it from the feed by default."
+            : "This will mark the item as not resolved so it appears in the active feed again."}
+        </Text>
+      ),
+      labels: {
+        confirm: willResolve ? "Mark resolved" : "Unresolve",
+        cancel: "Cancel",
+      },
+      confirmProps: { color: willResolve ? "green" : "gray" },
+      centered: true,
+      onConfirm: async () => {
+        try {
+          setResolvingId(post.id);
+          await updateDoc(doc(db, "posts", post.id), { resolved: willResolve });
+          notifications.show({
+            title: willResolve ? "Marked as resolved" : "Marked as unresolved",
+            message: willResolve
+              ? "The post is now hidden from the default feed."
+              : "The post is active again.",
+            color: willResolve ? "green" : "blue",
+            position: "top-center",
+          });
+        } catch (e) {
+          console.error("toggle resolved", e);
+          notifications.show({
+            title: "Update failed",
+            message: "Could not update the post. Try again.",
+            color: "red",
+            position: "top-center",
+          });
+        } finally {
+          setResolvingId(null);
         }
       },
     });
@@ -264,6 +315,7 @@ export default function HomePage() {
               comboboxProps={{ withinPortal: true }}
             />
           </Box>
+          {/* Include resolved toggle */}
         </Stack>
       </Box>
 
@@ -291,16 +343,32 @@ export default function HomePage() {
           {filtered.map((post) => {
             const isOwner = me && post.userId && me.uid === post.userId;
             const isDeleting = deletingId === post.id;
+            const isResolving = resolvingId === post.id;
 
             return (
-              <Card key={post.id} withBorder radius="lg" padding="md">
-                {/* Title + Type + (owner delete) */}
+              <Card
+                key={post.id}
+                withBorder
+                radius="lg"
+                padding="md"
+                style={{
+                  // Only mute when includedResolved is ON and the post is resolved
+                  opacity: includeResolved && post.resolved ? 0.6 : 1,
+                  position: "relative",
+                }}
+              >
+                {/* Title + Type + badges + owner actions */}
                 <Group justify="space-between" align="flex-start" mb={6}>
                   <Text fw={700} size="lg" style={{ letterSpacing: "-0.2px" }}>
                     {post.title}
                   </Text>
-                  <Group gap="xs">
+                  <Group gap="xs" align="center">
                     <Badge color={typeColor(post.type)}>{post.type}</Badge>
+                    {post.resolved && includeResolved && (
+                      <Badge color="gray" variant="light">
+                        Resolved
+                      </Badge>
+                    )}
                     {isOwner && (
                       <Tooltip label="Delete post">
                         <ActionIcon
@@ -309,7 +377,7 @@ export default function HomePage() {
                           size="lg"
                           aria-label="Delete"
                           onClick={() => confirmDelete(post.id)}
-                          disabled={isDeleting}
+                          disabled={isDeleting || isResolving}
                         >
                           {isDeleting ? (
                             <Loader size="xs" />
@@ -352,14 +420,22 @@ export default function HomePage() {
                   </Group>
                   <Group gap={6}>
                     {isOwner && (
-                      <Tooltip label="Mark as resolved">
+                      <Tooltip
+                        label={post.resolved ? "Unresolve" : "Mark as resolved"}
+                      >
                         <ActionIcon
-                          variant="subtle"
+                          variant={post.resolved ? "light" : "subtle"}
                           radius="xl"
                           size="lg"
-                          aria-label="Mark as resolved"
+                          aria-label="Toggle resolved"
+                          onClick={() => confirmToggleResolved(post)}
+                          disabled={isResolving || isDeleting}
                         >
-                          <IconCircleCheck size={18} />
+                          {isResolving ? (
+                            <Loader size="xs" />
+                          ) : (
+                            <IconCircleCheck size={18} />
+                          )}
                         </ActionIcon>
                       </Tooltip>
                     )}
