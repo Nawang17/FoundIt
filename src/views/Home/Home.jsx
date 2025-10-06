@@ -16,8 +16,8 @@ import {
   SegmentedControl,
   rem,
   Skeleton,
-  Flex,
   Loader,
+  Flex,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
@@ -27,6 +27,7 @@ import {
   IconMessage,
   IconCircleCheck,
 } from "@tabler/icons-react";
+import { useNavigate } from "react-router";
 
 import {
   collection,
@@ -55,10 +56,10 @@ function timeAgo(createdAt) {
     typeof createdAt === "number"
       ? createdAt
       : createdAt?.toMillis
-      ? createdAt.toMillis()
-      : createdAt?.seconds
-      ? createdAt.seconds * 1000
-      : +createdAt || Date.now();
+        ? createdAt.toMillis()
+        : createdAt?.seconds
+          ? createdAt.seconds * 1000
+          : +createdAt || Date.now();
   const diff = Date.now() - ms;
   if (diff < 60_000) return "just now";
   const minutes = Math.floor(diff / 60_000);
@@ -86,6 +87,7 @@ export default function HomePage() {
   const [deletingId, setDeletingId] = useState(null);
   const [resolvingId, setResolvingId] = useState(null); // ⬅️ NEW
   const isMobile = useMediaQuery("(max-width: 48em)");
+  const nav = useNavigate();
 
   // auth subscribe
   useEffect(() => {

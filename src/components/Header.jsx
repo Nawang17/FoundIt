@@ -1,4 +1,4 @@
-// src/components/AppHeader.jsx
+// Header component for navigation
 import { useEffect, useState } from "react";
 import { Box, Group, Button, Text } from "@mantine/core";
 import { useNavigate } from "react-router";
@@ -70,6 +70,10 @@ export default function AppHeader() {
           <>
             <Button onClick={() => navigate("/create-post")} color="blue">
               Create Post
+            </Button>
+
+            <Button onClick={() => navigate("/profile")} variant="subtle" color="blue">
+              Profile
             </Button>
 
             <Button onClick={handleLogout} color="red" variant="light">
