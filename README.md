@@ -1,5 +1,7 @@
 # FoundIt Web App
 
+Live demo: https://founditapp.netlify.app
+
 Lost & Found platform built with **Vite + React + Mantine + Firebase**.
 
 ---
@@ -28,4 +30,5 @@ npm install
 ```npm run dev```
 
 Go to http://localhost:5173/ to view live project
+
 
