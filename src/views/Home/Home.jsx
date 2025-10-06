@@ -16,6 +16,7 @@ import {
   SegmentedControl,
   rem,
   Skeleton,
+  Loader,
   Flex,
 } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
