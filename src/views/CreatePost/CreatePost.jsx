@@ -77,6 +77,7 @@ export default function CreatePostPage() {
           : user.displayName || user.email?.split("@")[0] || "Unknown",
         anonymous, // store this flag
         createdAt: serverTimestamp(),
+        resolved: false,
       };
 
       await addDoc(collection(db, "posts"), post);
