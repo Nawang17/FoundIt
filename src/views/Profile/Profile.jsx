@@ -311,7 +311,7 @@ export default function ProfilePage() {
                     {segment === "all" && (
                         <Group justify="center" mt="md">
                             <Button onClick={() => nav("/create-post")} color="blue">
-                                Create your first post
+                                {posts.length === 0 ? "Create your first post" : "Create post"}
                             </Button>
                         </Group>
                     )}
