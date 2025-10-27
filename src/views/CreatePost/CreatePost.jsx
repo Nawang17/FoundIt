@@ -286,7 +286,7 @@ export default function CreatePostPage() {
             value={imageFile}
             onChange={handleImageChange}
             clearable
-            description="JPEG/PNG/WebP recommended. Uploaded to Cloudinary; URL stored in the post."
+            description="JPEG/PNG/WebP recommended."
           />
 
           {previewUrl && (
