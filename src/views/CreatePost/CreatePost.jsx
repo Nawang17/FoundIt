@@ -8,18 +8,22 @@ import {
   SegmentedControl,
   Group,
   Button,
-  Select,
   Stack,
   Alert,
   Switch,
+  FileInput,
+  Image,
 } from "@mantine/core";
-import { IconAlertCircle } from "@tabler/icons-react";
+import { IconAlertCircle, IconPhoto, IconX } from "@tabler/icons-react";
 import { useNavigate } from "react-router";
 
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { db } from "../../../firebaseConfig";
 import { notifications } from "@mantine/notifications";
+
+const CLOUD_NAME = "dwzjfylgh";
+const UPLOAD_PRESET = "eoynoewz"; // import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET;
 
 export default function CreatePostPage() {
   const nav = useNavigate();
@@ -34,6 +38,10 @@ export default function CreatePostPage() {
   const [description, setDescription] = useState("");
   const [anonymous, setAnonymous] = useState(false);
 
+  // image state
+  const [imageFile, setImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState("");
+
   // ui state
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -46,11 +54,69 @@ export default function CreatePostPage() {
     return () => unsub();
   }, [auth]);
 
+  // 5 MB client cap (Cloudinary can take more, but keep UX snappy)
+  const MAX_BYTES = 5 * 1024 * 1024;
+
+  const handleImageChange = (file) => {
+    setError("");
+    setImageFile(null);
+    setPreviewUrl("");
+
+    if (!file) return;
+
+    if (!file.type?.startsWith("image/")) {
+      setError("Only image files are allowed.");
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      setError("Image must be 5 MB or smaller.");
+      return;
+    }
+
+    setImageFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const clearImage = () => {
+    setImageFile(null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl("");
+  };
+
   const validate = () => {
     if (!title.trim()) return "Title is required";
     if (!description.trim()) return "Description is required";
     return "";
   };
+
+  async function uploadToCloudinary(file) {
+    // Uses unsigned preset. Secure production setups should use **signed** uploads via your backend.
+    const form = new FormData();
+    form.append("file", file);
+    form.append("upload_preset", UPLOAD_PRESET);
+    // Optional: eager transformations, folder, tags, etc.
+    // form.append("folder", "lostfound");
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/upload`,
+      {
+        method: "POST",
+        body: form,
+      }
+    );
+
+    const data = await res.json();
+    if (!res.ok || !data.secure_url) {
+      const msg = data?.error?.message || "Cloudinary upload failed";
+      throw new Error(msg);
+    }
+    // Return key bits
+    return {
+      imageUrl: data.secure_url,
+      imagePublicId: data.public_id,
+      // you can also store width/height if you want: data.width, data.height
+    };
+  }
 
   const handleSubmit = async () => {
     setError("");
@@ -63,9 +129,20 @@ export default function CreatePostPage() {
       setError("You must be signed in to create a post");
       return;
     }
+    if (!CLOUD_NAME || !UPLOAD_PRESET) {
+      setError(
+        "Cloudinary is not configured. Set your cloud name and upload preset."
+      );
+      return;
+    }
 
     setSubmitting(true);
     try {
+      let uploadResult = null;
+      if (imageFile) {
+        uploadResult = await uploadToCloudinary(imageFile);
+      }
+
       const post = {
         type,
         title: title.trim(),
@@ -75,12 +152,14 @@ export default function CreatePostPage() {
         userName: anonymous
           ? "Anonymous"
           : user.displayName || user.email?.split("@")[0] || "Unknown",
-        anonymous, // store this flag
+        anonymous,
         createdAt: serverTimestamp(),
         resolved: false,
+        ...(uploadResult || {}), // adds imageUrl, imagePublicId if present
       };
 
       await addDoc(collection(db, "posts"), post);
+
       notifications.show({
         title: "Post created",
         message: "Your post has been created successfully.",
@@ -90,7 +169,7 @@ export default function CreatePostPage() {
       nav("/"); // back to feed
     } catch (e) {
       console.error(e);
-      setError("Failed to create post. Please try again.");
+      setError(e.message || "Failed to create post. Please try again.");
       setSubmitting(false);
     }
   };
@@ -136,7 +215,8 @@ export default function CreatePostPage() {
         Create a Post
       </Text>
       <Text c="dimmed" size="sm" mb="md">
-        Add a clear title, location, and details.
+        Add a clear title, location, and details. Optional: add one photo (≤ 5
+        MB).
       </Text>
 
       {error && (
@@ -196,6 +276,48 @@ export default function CreatePostPage() {
             checked={anonymous}
             onChange={(e) => setAnonymous(e.currentTarget.checked)}
           />
+
+          <FileInput
+            label="Photo (optional)"
+            placeholder="Select an image (≤ 5 MB)"
+            accept="image/*"
+            radius="md"
+            leftSection={<IconPhoto size={16} />}
+            value={imageFile}
+            onChange={handleImageChange}
+            clearable
+            description="JPEG/PNG/WebP recommended. Uploaded to Cloudinary; URL stored in the post."
+          />
+
+          {previewUrl && (
+            <Card withBorder radius="md" p="sm">
+              <Group justify="space-between" align="center" mb="sm">
+                <Text size="sm" fw={600}>
+                  Preview
+                </Text>
+                <Button
+                  size="xs"
+                  variant="subtle"
+                  leftSection={<IconX size={14} />}
+                  onClick={clearImage}
+                >
+                  Remove
+                </Button>
+              </Group>
+              <Image
+                src={previewUrl}
+                alt="Selected image preview"
+                radius="md"
+                maw={280}
+                mah={280}
+                fit="contain"
+              />
+              <Text size="xs" c="dimmed" mt="xs">
+                This is a local preview. The image will be uploaded when you
+                submit the post.
+              </Text>
+            </Card>
+          )}
 
           <Group justify="flex-end" mt="xs">
             <Button

@@ -1,6 +1,22 @@
-// Header component for navigation
 import { useEffect, useState } from "react";
-import { Box, Group, Button, Text } from "@mantine/core";
+import {
+  Box,
+  Group,
+  Button,
+  Text,
+  ActionIcon,
+  Avatar,
+  Tooltip,
+} from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
+import {
+  IconPlus,
+  IconLogout,
+  IconLogin,
+  IconUser,
+  IconUserPlus,
+  IconHome,
+} from "@tabler/icons-react";
 import { useNavigate } from "react-router";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
@@ -10,8 +26,10 @@ export default function AppHeader() {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
 
+  // Compact mode when space is small (≤ 640px)
+  const compact = useMediaQuery("(max-width: 40em)");
+
   useEffect(() => {
-    // Listen for Firebase Auth state changes
     const unsub = onAuthStateChanged(auth, (u) => setUser(u));
     return () => unsub();
   }, []);
@@ -38,7 +56,7 @@ export default function AppHeader() {
         height: 64,
         borderBottom: "1px solid #e9ecef",
         backgroundColor: "white",
-        boxShadow: "0 1px 3px rgba(0, 0, 0, 0.05)",
+        boxShadow: "0 2px 4px rgba(0,0,0,0.04)",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
@@ -46,55 +64,138 @@ export default function AppHeader() {
         position: "sticky",
         top: 0,
         zIndex: 100,
-        maxWidth: "1200px",
-        margin: "0 auto",
       }}
     >
-      {/* Logo / App Name */}
-      <Text
-        fw={700}
-        size="xl"
+      {/* Inner container keeps your current max width */}
+      <Box
         style={{
-          cursor: "pointer",
-          letterSpacing: "-0.5px",
-          color: "#1c7ed6",
+          width: "100%",
+          maxWidth: "1150px", // unchanged
+
+          margin: "0 auto",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
-        onClick={() => navigate("/")}
       >
-        FoundIt
-      </Text>
+        {/* Left: Home + Brand */}
+        <Group gap="xs">
+          {/* Show brand text only when not compact */}
 
-      {/* Auth Buttons */}
-      <Group gap="sm">
+          <Text
+            fw={800}
+            size="xl"
+            onClick={() => navigate("/")}
+            style={{
+              cursor: "pointer",
+              letterSpacing: "-0.5px",
+              color: "#1c7ed6",
+              fontFamily: "Inter, sans-serif",
+            }}
+          >
+            FoundIt
+          </Text>
+        </Group>
+
+        {/* Right: Auth actions — icons-only when compact; icons+text when roomy */}
         {user ? (
-          <>
-            <Button onClick={() => navigate("/create-post")} color="blue">
-              Create Post
-            </Button>
+          compact ? (
+            // Compact: icons only
+            <Group gap="xs">
+              <Tooltip label="Create post">
+                <ActionIcon
+                  variant="light"
+                  color="blue"
+                  size="lg"
+                  radius="xl"
+                  onClick={() => navigate("/create-post")}
+                  aria-label="Create post"
+                >
+                  <IconPlus size={18} />
+                </ActionIcon>
+              </Tooltip>
 
-            <Button onClick={() => navigate("/profile")} variant="subtle" color="blue">
-              Profile
-            </Button>
+              <Tooltip label="Profile">
+                <ActionIcon
+                  variant="subtle"
+                  color="blue"
+                  size="lg"
+                  radius="xl"
+                  onClick={() => navigate("/profile")}
+                  aria-label="Profile"
+                >
+                  {user.photoURL ? (
+                    <Avatar src={user.photoURL} size={22} radius="xl" />
+                  ) : (
+                    <IconUser size={18} />
+                  )}
+                </ActionIcon>
+              </Tooltip>
 
-            <Button onClick={handleLogout} color="red" variant="light">
-              Logout
-            </Button>
-          </>
+              <Tooltip label="Logout">
+                <ActionIcon
+                  variant="light"
+                  color="red"
+                  size="lg"
+                  radius="xl"
+                  onClick={handleLogout}
+                  aria-label="Logout"
+                >
+                  <IconLogout size={18} />
+                </ActionIcon>
+              </Tooltip>
+            </Group>
+          ) : (
+            // Roomy: icons + text
+            <Group gap="xs">
+              <Button
+                leftSection={<IconPlus size={16} />}
+                color="blue"
+                onClick={() => navigate("/create-post")}
+              >
+                Create Post
+              </Button>
+
+              <Button
+                leftSection={<IconUser size={16} />}
+                variant="subtle"
+                color="blue"
+                onClick={() => navigate("/profile")}
+              >
+                Profile
+              </Button>
+
+              <Button
+                leftSection={<IconLogout size={16} />}
+                color="red"
+                variant="light"
+                onClick={handleLogout}
+              >
+                Logout
+              </Button>
+            </Group>
+          )
         ) : (
-          <>
+          // Logged out, roomy: icons + text
+          <Group gap="xs">
             <Button
-              onClick={() => navigate("/login")}
+              leftSection={<IconLogin size={16} />}
               variant="subtle"
               color="blue"
+              onClick={() => navigate("/login")}
             >
               Login
             </Button>
-            <Button onClick={() => navigate("/register")} color="blue">
+            <Button
+              leftSection={<IconUserPlus size={16} />}
+              color="blue"
+              onClick={() => navigate("/register")}
+            >
               Register
             </Button>
-          </>
+          </Group>
         )}
-      </Group>
+      </Box>
     </Box>
   );
 }

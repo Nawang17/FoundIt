@@ -1,11 +1,9 @@
-// src/pages/HomePage.jsx
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Text,
   TextInput,
   Select,
-  SimpleGrid,
   Card,
   Group,
   Badge,
@@ -27,7 +25,6 @@ import {
   IconMessage,
   IconCircleCheck,
 } from "@tabler/icons-react";
-import { useNavigate } from "react-router";
 
 import {
   collection,
@@ -36,7 +33,7 @@ import {
   query as fsQuery,
   deleteDoc,
   doc,
-  updateDoc, // ⬅️ NEW
+  updateDoc,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { notifications } from "@mantine/notifications";
@@ -49,7 +46,7 @@ function initials(name = "") {
   return (parts[0][0] + (parts[parts.length - 1]?.[0] || "")).toUpperCase();
 }
 
-// Simple "time ago" helper for Firestore Timestamps / Dates / numbers
+// "time ago" helper
 function timeAgo(createdAt) {
   if (!createdAt) return "";
   const ms =
@@ -80,13 +77,14 @@ export default function HomePage() {
   const [query, setQuery] = useState("");
   const [segment, setSegment] = useState("all"); // all | lost | found
   const [sortBy, setSortBy] = useState("latest"); // latest | alpha
-  const [includeResolved, setIncludeResolved] = useState(false); // ⬅️ NEW: hide resolved by default
+  const [includeResolved, setIncludeResolved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [posts, setPosts] = useState([]);
-  const [me, setMe] = useState(null); // current user
+  const [me, setMe] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [resolvingId, setResolvingId] = useState(null); // ⬅️ NEW
+  const [resolvingId, setResolvingId] = useState(null);
   const isMobile = useMediaQuery("(max-width: 48em)");
+  const columns = isMobile ? 1 : 2; // Masonry columns
 
   // auth subscribe
   useEffect(() => {
@@ -95,7 +93,7 @@ export default function HomePage() {
     return () => unsub();
   }, []);
 
-  // Subscribe to Firestore posts ordered by createdAt desc for "Latest"
+  // Firestore subscribe (latest first)
   useEffect(() => {
     const q = fsQuery(collection(db, "posts"), orderBy("createdAt", "desc"));
     const unsub = onSnapshot(
@@ -112,13 +110,11 @@ export default function HomePage() {
             userId: v.userId || null,
             location: v.location || "",
             createdAt: v.createdAt || null,
-            resolved: !!v.resolved, // ⬅️ NEW
+            resolved: !!v.resolved,
+            imageUrl: v.imageUrl || null, // Cloudinary secure_url from create page
           };
         });
-
-        //filter resolved posts
-
-        setPosts(data.filter((p) => !p.resolved));
+        setPosts(data.filter((p) => !p.resolved)); // hide resolved by default
         setLoading(false);
       },
       (err) => {
@@ -149,14 +145,12 @@ export default function HomePage() {
         })
       : bySeg;
 
-    // Hide resolved unless explicitly included
     const byStatus = includeResolved
       ? byQuery
       : byQuery.filter((p) => !p.resolved);
 
     const bySort = [...byStatus].sort((a, b) => {
       if (sortBy === "alpha") return a.title.localeCompare(b.title);
-      // latest (createdAt desc)
       const aMs = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
       const bMs = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
       return bMs - aMs;
@@ -168,7 +162,7 @@ export default function HomePage() {
   const typeColor = (t) =>
     t === "lost" ? "red" : t === "found" ? "green" : "gray";
 
-  // Confirm + delete flow using Mantine modals
+  // Confirm + delete
   const confirmDelete = (postId) => {
     modals.openConfirmModal({
       title: "Delete this post?",
@@ -317,15 +311,32 @@ export default function HomePage() {
               comboboxProps={{ withinPortal: true }}
             />
           </Box>
-          {/* Include resolved toggle */}
         </Stack>
       </Box>
 
-      {/* Grid */}
+      {/* LOADING: skeletons in two masonry columns */}
       {loading ? (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+        <Box
+          style={{
+            columnCount: columns,
+            columnGap: "24px",
+          }}
+        >
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} withBorder radius="lg" padding="md">
+            <Card
+              key={i}
+              withBorder
+              radius="lg"
+              padding="md"
+              style={{
+                breakInside: "avoid",
+                WebkitColumnBreakInside: "avoid",
+                marginBottom: 24,
+                display: "inline-block",
+                width: "100%",
+              }}
+            >
+              <Skeleton height={220} mb="md" />
               <Skeleton height={18} mb="sm" />
               <Skeleton height={12} width="60%" mb={12} />
               <Skeleton height={12} mb={6} />
@@ -339,9 +350,15 @@ export default function HomePage() {
               </Group>
             </Card>
           ))}
-        </SimpleGrid>
+        </Box>
       ) : (
-        <SimpleGrid cols={{ base: 1, sm: 2, lg: 3 }} spacing="lg">
+        // LOADED: Masonry container (no row-height lock)
+        <Box
+          style={{
+            columnCount: columns,
+            columnGap: "24px",
+          }}
+        >
           {filtered.map((post) => {
             const isOwner = me && post.userId && me.uid === post.userId;
             const isDeleting = deletingId === post.id;
@@ -354,14 +371,50 @@ export default function HomePage() {
                 radius="lg"
                 padding="md"
                 style={{
-                  // Only mute when includedResolved is ON and the post is resolved
+                  breakInside: "avoid",
+                  WebkitColumnBreakInside: "avoid",
+                  marginBottom: 24,
+                  display: "inline-block",
+                  width: "100%",
                   opacity: includeResolved && post.resolved ? 0.6 : 1,
-                  position: "relative",
                 }}
               >
-                {/* Title + Type + badges + owner actions */}
+                {/* MEDIA (Cloudinary URL via plain <img>) */}
+                {post.imageUrl && (
+                  <div
+                    style={{
+                      width: "100%",
+                      overflow: "hidden",
+                      borderRadius: 12,
+                      marginBottom: 12,
+                      background: "#f6f7f8",
+                    }}
+                  >
+                    <img
+                      src={
+                        post.imageUrl.includes("/upload/")
+                          ? post.imageUrl.replace(
+                              "/upload/",
+                              "/upload/f_auto,q_auto,c_fill,w_900,h_500/"
+                            )
+                          : post.imageUrl
+                      }
+                      alt={post.title || "Post image"}
+                      loading="lazy"
+                      style={{
+                        width: "100%",
+                        height: "auto",
+                        aspectRatio: "16 / 9", // consistent crop, but masonry tolerates variable heights
+                        objectFit: "cover",
+                        display: "block",
+                      }}
+                    />
+                  </div>
+                )}
+
+                {/* Title + Type + actions */}
                 <Group justify="space-between" align="flex-start" mb={6}>
-                  <Text fw={700} size="lg" style={{ letterSpacing: "-0.2px" }}>
+                  <Text fw={700} size="md" style={{ letterSpacing: "-0.2px" }}>
                     {post.title}
                   </Text>
                   <Group gap="xs" align="center">
@@ -401,7 +454,7 @@ export default function HomePage() {
                   </Flex>
                 )}
 
-                <Text size="sm" lineClamp={3} mt="sm" mb="md">
+                <Text size="sm" lineClamp={2} mt="sm" mb="md">
                   {post.description}
                 </Text>
 
@@ -456,7 +509,7 @@ export default function HomePage() {
               </Card>
             );
           })}
-        </SimpleGrid>
+        </Box>
       )}
     </Box>
   );
