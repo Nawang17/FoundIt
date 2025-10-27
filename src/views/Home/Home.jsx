@@ -270,7 +270,7 @@ export default function HomePage() {
       >
         <Stack gap="xs">
           <TextInput
-            placeholder="Search by item, location, or user"
+            placeholder="Search by item or location"
             leftSection={<IconSearch size={16} />}
             value={query}
             onChange={(e) => setQuery(e.currentTarget.value)}
@@ -494,16 +494,18 @@ export default function HomePage() {
                         </ActionIcon>
                       </Tooltip>
                     )}
-                    <Tooltip label="Message user">
-                      <ActionIcon
-                        variant="subtle"
-                        radius="xl"
-                        size="lg"
-                        aria-label="Message user"
-                      >
-                        <IconMessage size={18} />
-                      </ActionIcon>
-                    </Tooltip>
+                    {!isOwner && (
+                      <Tooltip label="Message user">
+                        <ActionIcon
+                          variant="subtle"
+                          radius="xl"
+                          size="lg"
+                          aria-label="Message user"
+                        >
+                          <IconMessage size={18} />
+                        </ActionIcon>
+                      </Tooltip>
+                    )}
                   </Group>
                 </Group>
               </Card>
