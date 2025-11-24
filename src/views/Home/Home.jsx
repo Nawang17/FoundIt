@@ -39,6 +39,8 @@ import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { notifications } from "@mantine/notifications";
 import { modals } from "@mantine/modals";
 import { db } from "../../../firebaseConfig";
+import ChatPopup from "../Messages/ChatPopUp"; // ⬅️ NEW
+
 
 function initials(name = "") {
   const parts = name.trim().split(" ");
@@ -53,10 +55,10 @@ function timeAgo(createdAt) {
     typeof createdAt === "number"
       ? createdAt
       : createdAt?.toMillis
-      ? createdAt.toMillis()
-      : createdAt?.seconds
-      ? createdAt.seconds * 1000
-      : +createdAt || Date.now();
+        ? createdAt.toMillis()
+        : createdAt?.seconds
+          ? createdAt.seconds * 1000
+          : +createdAt || Date.now();
   const diff = Date.now() - ms;
   if (diff < 60_000) return "just now";
   const minutes = Math.floor(diff / 60_000);
@@ -85,6 +87,8 @@ export default function HomePage() {
   const [resolvingId, setResolvingId] = useState(null);
   const isMobile = useMediaQuery("(max-width: 48em)");
   const columns = isMobile ? 1 : 2; // Masonry columns
+  const [chatUser, setChatUser] = useState(null); // ⬅️ NEW
+  const [chatUserName, setChatUserName] = useState(null); // ⬅️ NEW
 
   // auth subscribe
   useEffect(() => {
@@ -138,11 +142,11 @@ export default function HomePage() {
     const qtext = query.trim().toLowerCase();
     const byQuery = qtext
       ? bySeg.filter((p) => {
-          const t = p.title?.toLowerCase() || "";
-          const d = p.description?.toLowerCase() || "";
-          const l = p.location?.toLowerCase() || "";
-          return t.includes(qtext) || d.includes(qtext) || l.includes(qtext);
-        })
+        const t = p.title?.toLowerCase() || "";
+        const d = p.description?.toLowerCase() || "";
+        const l = p.location?.toLowerCase() || "";
+        return t.includes(qtext) || d.includes(qtext) || l.includes(qtext);
+      })
       : bySeg;
 
     const byStatus = includeResolved
@@ -394,9 +398,9 @@ export default function HomePage() {
                       src={
                         post.imageUrl.includes("/upload/")
                           ? post.imageUrl.replace(
-                              "/upload/",
-                              "/upload/f_auto,q_auto,c_fill,w_900,h_500/"
-                            )
+                            "/upload/",
+                            "/upload/f_auto,q_auto,c_fill,w_900,h_500/"
+                          )
                           : post.imageUrl
                       }
                       alt={post.title || "Post image"}
@@ -501,6 +505,7 @@ export default function HomePage() {
                           radius="xl"
                           size="lg"
                           aria-label="Message user"
+                          onClick={() => { setChatUser(post.userId); setChatUserName(post.user); }}
                         >
                           <IconMessage size={18} />
                         </ActionIcon>
@@ -513,6 +518,12 @@ export default function HomePage() {
           })}
         </Box>
       )}
+      <ChatPopup
+        opened={!!chatUser}
+        onClose={() => setChatUser(null)}
+        receiverUid={chatUser}
+        receiverName={chatUserName}
+      />
     </Box>
   );
 }
