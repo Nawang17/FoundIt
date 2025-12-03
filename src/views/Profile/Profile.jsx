@@ -29,6 +29,8 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  getDocs,
+  serverTimestamp,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { notifications } from "@mantine/notifications";
@@ -205,7 +207,26 @@ export default function ProfilePage() {
       onConfirm: async () => {
         try {
           setResolvingId(post.id);
+
           await updateDoc(doc(db, "posts", post.id), { resolved: willResolve });
+
+          try {
+            const chatsRef = collection(db, "chats");
+            const q = fsQuery(chatsRef, where("postId", "==", post.id));
+            const snap = await getDocs(q);
+
+            const updates = snap.docs.map((d) =>
+              updateDoc(d.ref, {
+                resolved: willResolve,
+                updatedAt: serverTimestamp(),
+              })
+            );
+
+            await Promise.all(updates);
+          } catch (err) {
+            console.error("update chats for resolved post", err);
+          }
+
           notifications.show({
             title: willResolve ? "Marked as resolved" : "Marked as unresolved",
             message: willResolve
@@ -228,7 +249,6 @@ export default function ProfilePage() {
       },
     });
   };
-
   return (
     <Box style={{ maxWidth: "1200px", margin: "0 auto", padding: "24px" }}>
       {/* Profile Header */}

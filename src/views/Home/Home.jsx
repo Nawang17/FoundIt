@@ -34,13 +34,17 @@ import {
   deleteDoc,
   doc,
   updateDoc,
+  getDoc,
+  setDoc,
+  getDocs,
+  where,
+  serverTimestamp,
 } from "firebase/firestore";
 import { getAuth, onAuthStateChanged } from "firebase/auth";
 import { notifications } from "@mantine/notifications";
 import { modals } from "@mantine/modals";
 import { db } from "../../../firebaseConfig";
-import ChatPopup from "../Messages/ChatPopUp"; // ⬅️ NEW
-
+import ChatPopup from "../Messages/ChatPopUp";
 
 function initials(name = "") {
   const parts = name.trim().split(" ");
@@ -55,10 +59,10 @@ function timeAgo(createdAt) {
     typeof createdAt === "number"
       ? createdAt
       : createdAt?.toMillis
-        ? createdAt.toMillis()
-        : createdAt?.seconds
-          ? createdAt.seconds * 1000
-          : +createdAt || Date.now();
+      ? createdAt.toMillis()
+      : createdAt?.seconds
+      ? createdAt.seconds * 1000
+      : +createdAt || Date.now();
   const diff = Date.now() - ms;
   if (diff < 60_000) return "just now";
   const minutes = Math.floor(diff / 60_000);
@@ -87,9 +91,10 @@ export default function HomePage() {
   const [resolvingId, setResolvingId] = useState(null);
   const isMobile = useMediaQuery("(max-width: 48em)");
   const columns = isMobile ? 1 : 2; // Masonry columns
-  const [chatUser, setChatUser] = useState(null); // ⬅️ NEW
-  const [chatUserName, setChatUserName] = useState(null); // ⬅️ NEW
-
+  const [activeChatId, setActiveChatId] = useState(null);
+  const [activeChatPost, setActiveChatPost] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
   // auth subscribe
   useEffect(() => {
     const auth = getAuth();
@@ -128,6 +133,82 @@ export default function HomePage() {
     );
     return () => unsub();
   }, []);
+  const buildChatId = (postId, uid1, uid2) => {
+    const arr = [uid1, uid2].sort();
+    return `${postId}_${arr[0]}_${arr[1]}`;
+  };
+  const handleMessageClick = async (post) => {
+    if (!me) {
+      notifications.show({
+        title: "Login required",
+        message: "You need to sign in to message someone.",
+        color: "red",
+        position: "top-center",
+      });
+      return;
+    }
+
+    if (!post.userId || me.uid === post.userId) {
+      notifications.show({
+        title: "Messaging unavailable",
+        message: "You cannot start a chat for this post.",
+        color: "red",
+        position: "top-center",
+      });
+      return;
+    }
+
+    if (post.resolved) {
+      notifications.show({
+        title: "Post resolved",
+        message: "This post has been resolved. Messaging is closed.",
+        color: "gray",
+        position: "top-center",
+      });
+      return;
+    }
+
+    try {
+      setCreatingChat(true);
+
+      const chatId = buildChatId(post.id, me.uid, post.userId);
+      const chatRef = doc(db, "chats", chatId);
+      const snap = await getDoc(chatRef);
+
+      if (!snap.exists()) {
+        await setDoc(chatRef, {
+          postId: post.id,
+          postTitle: post.title || "",
+          postOwnerId: post.userId,
+          userIds: [me.uid, post.userId].sort(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastMessage: null,
+          lastSenderId: null,
+          resolved: !!post.resolved,
+        });
+      } else {
+        // optional bookkeeping
+        await updateDoc(chatRef, {
+          updatedAt: serverTimestamp(),
+        });
+      }
+
+      setActiveChatId(chatId);
+      setActiveChatPost(post);
+      setChatOpen(true);
+    } catch (e) {
+      console.error("open chat", e);
+      notifications.show({
+        title: "Could not open chat",
+        message: "Something went wrong while opening the chat.",
+        color: "red",
+        position: "top-center",
+      });
+    } finally {
+      setCreatingChat(false);
+    }
+  };
 
   const counts = useMemo(() => {
     const lost = posts.filter((p) => p.type === "lost").length;
@@ -142,11 +223,11 @@ export default function HomePage() {
     const qtext = query.trim().toLowerCase();
     const byQuery = qtext
       ? bySeg.filter((p) => {
-        const t = p.title?.toLowerCase() || "";
-        const d = p.description?.toLowerCase() || "";
-        const l = p.location?.toLowerCase() || "";
-        return t.includes(qtext) || d.includes(qtext) || l.includes(qtext);
-      })
+          const t = p.title?.toLowerCase() || "";
+          const d = p.description?.toLowerCase() || "";
+          const l = p.location?.toLowerCase() || "";
+          return t.includes(qtext) || d.includes(qtext) || l.includes(qtext);
+        })
       : bySeg;
 
     const byStatus = includeResolved
@@ -224,7 +305,26 @@ export default function HomePage() {
       onConfirm: async () => {
         try {
           setResolvingId(post.id);
+
           await updateDoc(doc(db, "posts", post.id), { resolved: willResolve });
+
+          try {
+            const chatsRef = collection(db, "chats");
+            const q = fsQuery(chatsRef, where("postId", "==", post.id));
+            const snap = await getDocs(q);
+
+            const updates = snap.docs.map((d) =>
+              updateDoc(d.ref, {
+                resolved: willResolve,
+                updatedAt: serverTimestamp(),
+              })
+            );
+
+            await Promise.all(updates);
+          } catch (err) {
+            console.error("update chats for resolved post", err);
+          }
+
           notifications.show({
             title: willResolve ? "Marked as resolved" : "Marked as unresolved",
             message: willResolve
@@ -398,9 +498,9 @@ export default function HomePage() {
                       src={
                         post.imageUrl.includes("/upload/")
                           ? post.imageUrl.replace(
-                            "/upload/",
-                            "/upload/f_auto,q_auto,c_fill,w_900,h_500/"
-                          )
+                              "/upload/",
+                              "/upload/f_auto,q_auto,c_fill,w_900,h_500/"
+                            )
                           : post.imageUrl
                       }
                       alt={post.title || "Post image"}
@@ -499,15 +599,22 @@ export default function HomePage() {
                       </Tooltip>
                     )}
                     {!isOwner && (
-                      <Tooltip label="Message user">
+                      <Tooltip
+                        label={post.resolved ? "Post resolved" : "Message user"}
+                      >
                         <ActionIcon
                           variant="subtle"
                           radius="xl"
                           size="lg"
                           aria-label="Message user"
-                          onClick={() => { setChatUser(post.userId); setChatUserName(post.user); }}
+                          onClick={() => handleMessageClick(post)}
+                          disabled={creatingChat || post.resolved}
                         >
-                          <IconMessage size={18} />
+                          {creatingChat && activeChatPost?.id === post.id ? (
+                            <Loader size="xs" />
+                          ) : (
+                            <IconMessage size={18} />
+                          )}
                         </ActionIcon>
                       </Tooltip>
                     )}
@@ -518,12 +625,15 @@ export default function HomePage() {
           })}
         </Box>
       )}
-      <ChatPopup
-        opened={!!chatUser}
-        onClose={() => setChatUser(null)}
-        receiverUid={chatUser}
-        receiverName={chatUserName}
-      />
+      {activeChatId && (
+        <ChatPopup
+          opened={chatOpen}
+          onClose={() => setChatOpen(false)}
+          chatId={activeChatId}
+          post={activeChatPost}
+          me={me}
+        />
+      )}
     </Box>
   );
 }

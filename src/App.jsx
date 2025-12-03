@@ -9,6 +9,7 @@ import RegisterPage from "./views/Register/Register";
 import HomePage from "./views/Home/Home";
 import CreatePostPage from "./views/CreatePost/CreatePost";
 import ProfilePage from "./views/Profile/Profile";
+import MessagesPage from "./views/Messages/MessagesPage";
 function App() {
   return (
     <BrowserRouter>
@@ -22,6 +23,7 @@ function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/create-post" element={<CreatePostPage />} />
             <Route path="/profile" element={<ProfilePage />} />
+            <Route path="/Chats" element={<MessagesPage />} />
           </Routes>
         </ModalsProvider>
       </MantineProvider>

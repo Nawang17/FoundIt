@@ -16,6 +16,7 @@ import {
   IconUser,
   IconUserPlus,
   IconHome,
+  IconMessage,
 } from "@tabler/icons-react";
 import { useNavigate } from "react-router";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -70,7 +71,7 @@ export default function AppHeader() {
       <Box
         style={{
           width: "100%",
-          maxWidth: "1150px", // unchanged
+          maxWidth: "1150px",
 
           margin: "0 auto",
           display: "flex",
@@ -114,7 +115,18 @@ export default function AppHeader() {
                   <IconPlus size={18} />
                 </ActionIcon>
               </Tooltip>
-
+              <Tooltip label="Chats">
+                <ActionIcon
+                  variant="subtle"
+                  color="blue"
+                  size="lg"
+                  radius="xl"
+                  onClick={() => navigate("/Chats")}
+                  aria-label="Chats"
+                >
+                  <IconMessage size={18} />
+                </ActionIcon>
+              </Tooltip>
               <Tooltip label="Profile">
                 <ActionIcon
                   variant="subtle"
@@ -154,6 +166,14 @@ export default function AppHeader() {
                 onClick={() => navigate("/create-post")}
               >
                 Create Post
+              </Button>
+              <Button
+                leftSection={<IconMessage size={16} />}
+                variant="subtle"
+                color="blue"
+                onClick={() => navigate("/Chats")}
+              >
+                Chats
               </Button>
 
               <Button
