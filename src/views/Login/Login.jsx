@@ -135,7 +135,24 @@ export default function LoginPage({ onSuccess }) {
       </Button>
 
       <Divider label="or" my="md" />
-
+      <Button
+        mb={10}
+        variant="outline"
+        fullWidth
+        onClick={async () => {
+          await signInWithEmailAndPassword(auth, "Demo@gmail.com", "Demo123");
+          notifications.show({
+            color: "green",
+            title: "Welcome back",
+            message: "Signed in successfully.",
+            position: "top-center",
+          });
+          onSuccess?.();
+          navigate("/");
+        }}
+      >
+        Demo Login
+      </Button>
       <Button
         variant="outline"
         leftSection={<IconBrandGoogle size={18} />}
