@@ -93,13 +93,15 @@ export default function MessagesPage() {
   }, [me]);
 
   const filtered = useMemo(() => {
-    if (filter === "open") {
-      return chats.filter((c) => !c.resolved);
-    }
-    if (filter === "resolved") {
-      return chats.filter((c) => c.resolved);
-    }
-    return chats;
+    // 1. apply resolved/unresolved filters
+    let list = chats;
+    if (filter === "open") list = list.filter((c) => !c.resolved);
+    else if (filter === "resolved") list = list.filter((c) => c.resolved);
+
+    // 2. remove empty chats (no messages yet)
+    list = list.filter((c) => c.lastMessage && c.lastMessage.trim() !== "");
+
+    return list;
   }, [chats, filter]);
 
   const handleOpenChat = (chat) => {
@@ -180,11 +182,10 @@ export default function MessagesPage() {
                       </Badge>
                     )}
                   </Group>
-                  {chat.lastMessage && (
-                    <Text size="sm" c="dimmed" lineClamp={1}>
-                      {chat.lastMessage}
-                    </Text>
-                  )}
+
+                  <Text size="sm" c="dimmed" lineClamp={1}>
+                    {chat.lastMessage}
+                  </Text>
                 </Box>
                 <Text size="xs" c="dimmed">
                   {timeAgoTs(chat.updatedAt)}
